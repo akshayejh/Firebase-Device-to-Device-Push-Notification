@@ -33,3 +33,17 @@ Users Table :
     - device_token : user_device_token
     - name : user_name
 ```
+
+Notification Table : 
+
+```
+- notifications
+  - to_user_id
+    - notification_id
+      - from : from_user_id
+```
+
+## Important :
+
+Currently this method works with user who is logged in a single device instead of multiple.
+I'll be adding code for Multiple device login too, in future.
