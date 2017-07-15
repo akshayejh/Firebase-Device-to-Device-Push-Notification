@@ -26,13 +26,9 @@ exports.sendNotification = functions.database.ref('/notifications/{user_id}/{not
    */
 
   const user_id = event.params.user_id;
-  const notification = event.params.notification;
+  const notification_id = event.params.notification_id;
 
-  /*
-   * A simple Log to check if everything works till here...
-   */
-
-  console.log('We have a notification to send to : ', user_id);
+  console.log('We have a notification from : ', user_id);
 
   /*
    * Stops proceeding to the rest of the function if the entry is deleted from database.
@@ -47,48 +43,60 @@ exports.sendNotification = functions.database.ref('/notifications/{user_id}/{not
   }
 
   /*
-   * This is how we can retreive Token ID from the database and store it as a variable named
-   * 'token_id' from result.
+   * 'fromUser' query retreives the ID of the user who sent the notification
    */
 
-  const deviceToken = admin.database().ref(`/Users/${user_id}/device_token`).once('value');
+  const fromUser = admin.database().ref(`/notifications/${user_id}/${notification_id}`).once('value');
 
-  /*
-   * Rest of the function should be included inside ' deviceToken.then() ' to work with
-   * the token or else it wont work.
-   */
+  return fromUser.then(fromUserResult => {
 
-  return deviceToken.then(result => {
+    const from_user_id = fromUserResult.val().from;
 
-    const token_id = result.val();
+    console.log('You have new notification from  : ', from_user_id);
 
     /*
-     * Here we are storing notification as payload to use it later.
+     * The we run two queries at a time using Firebase 'Promise'.
+     * One to get the name of the user who sent the notification
+     * another one to get the devicetoken to the device we want to send notification to
      */
 
-    const payload = {
-      notification: {
-        title : "Friend Request",
-        body: "You've received a new Friend Request",
-        icon: "default"
-      }
-    };
+    const userQuery = admin.database().ref(`Users/${from_user_id}/name`).once('value');
+    const deviceToken = admin.database().ref(`/Users/${user_id}/device_token`).once('value');
 
-    /*
-     * And Lastly using admin.messaging().sendToDevice we are sending notification
-     * to the device using the token_id and payload.
-     * In response, we are just logging some text to console. Error handling will be
-     * added soon.
-     */
+    return Promise.all([userQuery, deviceToken]).then(result => {
 
-    return admin.messaging().sendToDevice(token_id, payload).then(response => {
+      const userName = result[0].val();
+      const token_id = result[1].val();
 
-      console.log('This was the notification Feature');
+      /*
+       * We are creating a 'payload' to create a notification to be sent.
+       */
+
+      const payload = {
+        notification: {
+          title : "New Friend Request",
+          body: `${userName} has sent you request`,
+          icon: "default",
+          click_action : "in.tvac.akshaye.lapitchat_TARGET_NOTIFICATION"
+        },
+        data : {
+          from_user_id : from_user_id
+        }
+      };
+
+      /*
+       * Then using admin.messaging() we are sending the payload notification to the token_id of
+       * the device we retreived.
+       */
+
+      return admin.messaging().sendToDevice(token_id, payload).then(response => {
+
+        console.log('This was the notification Feature');
+
+      });
 
     });
 
-
   });
-
 
 });
